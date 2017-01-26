@@ -318,6 +318,16 @@ bool isComValid(int *fdArr, char *args[], int numFiles, int *ioe){
       fprintf(stderr, "Invalid file descriptor. Either the file descriptor is invalid (they must be between 0 and %d.), or is already closed.\n", numFiles - 1);
       return false;
     }
+
+    //check that file descriptors are not the same
+    int j;
+    for (j = i - 1; j >=0; j--){
+      if (ioe[j] == fd){
+	fprintf(stderr, "Three file descriptors must be different.\n");
+	return false;
+      }
+    }
+
     //assign fd to appropriate place
     ioe[i] = fd;
   }
