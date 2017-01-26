@@ -6,17 +6,24 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
-bool openFile(char *opt,int flags);
-bool isComValid(char *args[], int numFiles, int *in, int *out, int *err);
-void exeCom(char *args[], int in, int out, int err);
+int openFile(char *opt,int flags);
+bool isComValid(int *fdArr, char *args[],int numFiles, int *ioe);
+void exeCom(char *args[], int* ioe);
 int numArg(char *args[]);
 void printOpt(bool isVerbose, char *args[], int index);
-int * fAlloc(int *fdArr, int *numFiles, int *nFdArr);
+void closeFds(int *fdArr, int numFiles);
+int * fAlloc(int *fdArr, int numFiles, int *nFd);
+int ctoi(char* numChar);
+
 
 int main(int argc, char *argv[]){
 
-
+  int *fdArr = NULL;
+  int numFiles = 0;
+  int nFd = 0;
+  fdArr = fAlloc(fdArr,numFiles, &nFd);
 
   struct option longopts[] = { //all options
     {"append", no_argument, NULL, '/'},
@@ -47,7 +54,6 @@ int main(int argc, char *argv[]){
   int perOpt[3] = {O_RDONLY, O_WRONLY, O_RDWR}; //array for file permission
 
   //getOpt related
-  int numFiles = 0; //count of files that are opened by this program
   int opt;
   int longindex;
   int prevInd = 1;
@@ -62,11 +68,11 @@ int main(int argc, char *argv[]){
 
   //file option related
   int flags = 0; //accumulator for flags of file opening options
-  bool isOpen;
+  int fd;
 
 
   //command option temporary variables
-  int in, out, err;
+  int ioe[3];
   bool isValid;
 
 
@@ -96,20 +102,28 @@ int main(int argc, char *argv[]){
     case 'r':
     case 's':
     case 't':
-      isOpen = openFile(argv[optind - 2],flags | perOpt[opt - 114]);
-      if(isOpen){ //if successfully opened, increment file counter
-	numFiles++;
+      //check that array is not full
+      if(numFiles + 1 >= nFd){
+	fdArr = fAlloc(fdArr, numFiles, &nFd);
       }
-      else{ //if failed, return code should be 1
+      fd = openFile(argv[optind - 2],flags | perOpt[opt - 114]);
+      //if failed to open, return code should be set to 1
+      if(fd == -1){
 	retCode = 1;
+      }
+      //else, number of files should be increased
+      else{
+	fdArr[numFiles] = fd;
+	numFiles++;
       }
       flags = 0; //reset the flag
       break;
 
     case 'c':
-      isValid = isComValid(argv + optind, numFiles, &in, &out, &err);
+      isValid = isComValid(fdArr, argv + optind, numFiles, ioe);
 
       if (!isValid){ //if command is not valid, set return code to 1 and ignore the command
+	fprintf(stderr, "Skipping this command. \n");
 	retCode = 1;
 	break;
       }
@@ -118,7 +132,7 @@ int main(int argc, char *argv[]){
       p_id = fork();
       if(p_id == 0){ //child
 
-	exeCom(argv + optind, in, out, err);
+	exeCom(argv + optind, ioe);
 	return 0;
       }
       else{ //parent
@@ -146,7 +160,7 @@ int main(int argc, char *argv[]){
 
 }
 
-bool openFile(char *opt, int flags){ //opens the file (if not invalid)
+int openFile(char *opt, int flags){ //opens the file (if not invalid)
 
   int oStatus;
 
@@ -154,23 +168,24 @@ bool openFile(char *opt, int flags){ //opens the file (if not invalid)
   if (optarg[0] == '-' && optarg[1] == '-'){
     fprintf(stderr, "No argument passed for %s. Skipping this option.\n", opt);
     optind--;
-    return false;
+    return -1;
   }
   oStatus = open(optarg, flags, wrAll);
   if (oStatus == -1){
     perror(optarg);
-    fprintf(stderr, "Skipping this option.\n");
-    return false;
+    fprintf(stderr, "Failed to open the file. Skipping this option.\n");
+    return -1;
   }
 
-  return true;
+
+  return oStatus;
 
 }
 
 
-bool isComValid(char *args[], int numFiles, int *in, int *out, int *err){
+bool isComValid(int *fdArr, char *args[], int numFiles, int *ioe){
 
-
+  //check argument exists
   int i;
   for(i = 0;i < 3;i++){
     if (args[i] == NULL){
@@ -178,55 +193,33 @@ bool isComValid(char *args[], int numFiles, int *in, int *out, int *err){
       return false;
     }
 
-    int digits = 0;
-    int j;
-    for(j = 0; args[i][j] != '\0'; j++){ //check number of digits, and make sure each character is a number.
-      if ((int)args[i][j] - 48 < 0 || (int)args[i][j] - 48 > 9)
-	{
-	  fprintf(stderr, "File descriptor must be a number.\n");
-	  return false;
-	}
-      digits++;
-    }
-
-    int fd = 0;
-    int mult = 1;
-    int k;
-    for (k = digits - 1; k >=0; k--){ //convert characters to digits
-      fd += ((int) args[i][k] - 48) * mult;
-      mult *= 10;
-    }
-
-    if (fd >= numFiles){ //check that resulting fd is within range
-      fprintf(stderr, "Invalid file descriptor. The file descriptor must be between 0 and %d.\n", numFiles - 1);
+    //check that each argument is a number
+    int fd;
+    fd = ctoi(args[i]);
+    if(fd < 0){
       return false;
     }
-
-    switch(i){ //assign fd to appropriate place
-    case 0:
-      *in = fd + 3;
-      break;
-    case 1:
-      *out = fd + 3;
-      break;
-    case 2:
-      *err = fd + 3;
-      break;
+    //check that resulting fd is within range
+    if (fd >= numFiles || fdArr[i] == -1){ 
+      fprintf(stderr, "Invalid file descriptor. Either the file descriptor is invalid (they must be between 0 and %d.), or is already closed.\n", numFiles - 1);
+      return false;
     }
-
-
+    //assign fd to appropriate place
+    ioe[i] = fdArr[fd];
   }
 
+  //check that command exists
   if (args[3] == NULL){ //check that command exists
     fprintf(stderr, "Must have name of the command. \n");
     return false;
   }
   
+
   return true;
 
 }
 
-void exeCom(char *args[], int in, int out, int err){
+void exeCom(char *args[], int *ioe){
 
   int l;
   for(l = 4; args[l] != NULL; l++){ //set one after last element to null
@@ -239,22 +232,14 @@ void exeCom(char *args[], int in, int out, int err){
     }
   }
 
-
-
-  close(0);
-  dup(in);
-  close(in);
-  close(1);
-  dup(out);
-  close(out);
-  close(2);
-  dup(err);
-  close(err);
+  int i;
+  for (i = 0; i < 3; i++){
+    close(i);
+    dup(ioe[i]);
+    close(ioe[i]);
+  }
 
   execvp(args[3], (args + 3));
-
-
-
 
 
 }
@@ -295,5 +280,83 @@ void printOpt(bool isVerbose, char *args[], int index){
       printf("%s ", args[index + i]);
     }
   }
+
+}
+
+void closeFds(int *fdArr, int numFiles){
+
+  int i;
+  for (i = 0; i < numFiles; i++){
+    if(fdArr[i] != -1){
+      if(close(fdArr[i]) == -1){
+	fprintf(stderr, "Error closing file descriptor %d", i);
+	perror(NULL);
+	fprintf(stderr, "\n");
+      }
+    }
+  }
+
+  free(fdArr);
+
+
+}
+int *fAlloc(int *fdArr, int numFiles, int *nFd){
+
+  if(fdArr == NULL){ //malloc
+    fdArr = (int*)malloc((*nFd + 100) * sizeof(int));
+    if(fdArr == NULL){
+      fprintf(stderr, "Failed to allocate memory for the file descriptors.");
+      closeFds(fdArr, numFiles);
+      _exit(1);
+    }
+    else{
+      *nFd += 100;
+    }
+  }
+
+
+    else{ //realloc
+      int *temp;
+      temp = (int*)realloc(fdArr,(*nFd + 100) * sizeof(int));
+      if(temp == NULL){
+	fprintf(stderr, "Failed to reallocate memory for the file descriptors.\n");
+	closeFds(fdArr, numFiles);
+	_exit(1);
+      }
+      else{
+	*nFd += 100;
+	fdArr = temp;
+      }
+
+
+
+    }
+
+  return fdArr;
+}
+
+int ctoi(char *numChar){
+
+  int digits = 0;
+  int i;
+  //check number of digits, and make sure each character is a number
+  for(i = 0; numChar[i] != '\0'; i++){
+      if ((int)numChar[i] - 48 < 0 || (int)numChar[i] - 48 > 9)
+	{
+	  fprintf(stderr, "File descriptor must be a number.\n");
+	  return -1;
+	}
+      digits++;
+    }
+    
+    int fd = 0;
+    int mult = 1;
+    int k;
+    for (k = digits - 1; k >=0; k--){ //convert characters to digits
+      fd += ((int) numChar[k] - 48) * mult;
+      mult *= 10;
+    }
+
+    return fd;
 
 }

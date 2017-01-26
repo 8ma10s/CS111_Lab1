@@ -1,0 +1,4 @@
+Limitations:
+So far, my parent process cannot get the return status of the child (s).
+Also, my parent process does not wait for child to finish (no wait option)
+File desriptors are not closed.

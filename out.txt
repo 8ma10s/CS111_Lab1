@@ -1,0 +1,13 @@
+804608241makechecktest
+err.txt
+in.txt
+lab1areadergradingtempdir
+Makefile
+Makefile~
+out.txt
+README
+simpsh
+simpsh.c
+simpsh.c~
+ts2.sh
+ts.sh
