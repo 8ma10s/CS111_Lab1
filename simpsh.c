@@ -17,13 +17,17 @@ typedef struct pidWrapper {
 
 int openFile(char *opt,int flags);
 bool isComValid(int *fdArr, char *args[],int numFiles, int *ioe);
-void exeCom(char *args[], int* ioe);
+void exeCom(char *args[], int* ioe, int *fdArr, int numFiles);
 int numArg(char *args[]);
 void printOpt(bool isVerbose, char *args[], int index);
 void closeFds(int *fdArr, int numFiles);
 int * fAlloc(int *fdArr, int numFiles, int *nFd, pidWrapper *pidArr);
 int ctoi(char* numChar);
 pidWrapper *pAlloc(pidWrapper *pidArr, int numProc, int *nPid, int *fdArr, int numFiles);
+bool makePipe(int *fdArr, int numFiles);
+
+
+
 
 int main(int argc, char *argv[]){
 
@@ -53,6 +57,8 @@ int main(int argc, char *argv[]){
     {"rdonly", required_argument, NULL, 'r' },
     {"wronly", required_argument, NULL, 's' },
     {"rdwr", required_argument, NULL, 't' },
+    {"pipe", no_argument, NULL, 'u'},
+
     {"command", no_argument, NULL, 'c' },
     {"wait", no_argument, NULL, 'w'},
     {"verbose", no_argument, NULL, 'v' },
@@ -91,7 +97,7 @@ int main(int argc, char *argv[]){
   //parent related variables
   int retCode = 0;
 
-  while ((opt = getopt_long(argc, argv, "/0123456789r:s:t:cwv", longopts, &longindex)) != -1){
+  while ((opt = getopt_long(argc, argv, "/0123456789r:s:t:ucwv", longopts, &longindex)) != -1){
 
     printOpt(isVerbose, argv, prevInd);
     switch(opt) {
@@ -111,6 +117,8 @@ int main(int argc, char *argv[]){
       flags = flags | (fileOpt[ opt - 47]); //add the corresponding file option to flags
       break;
 
+
+    //FILE-OPENING OPTIONS
     case 'r':
     case 's':
     case 't':
@@ -123,12 +131,26 @@ int main(int argc, char *argv[]){
       if(fd == -1){
 	retCode = 1;
       }
-      //else, number of files should be increased
-      else{
-	fdArr[numFiles] = fd;
-	numFiles++;
-      }
+      //Number of files should be increased
+      fdArr[numFiles] = fd;
+      numFiles++;
       flags = 0; //reset the flag
+      break;
+
+    case 'u': //pipe
+      if(numFiles + 2 >= nFd){
+	fdArr = fAlloc(fdArr, numFiles, &nFd, pidArr);
+      }
+      if(!makePipe(fdArr, numFiles)){
+	closeFds(fdArr, numFiles);
+	free(pidArr);
+	_exit(1);
+      }
+      else{
+	numFiles += 2;
+      }
+
+
       break;
 
     case 'c':
@@ -151,7 +173,7 @@ int main(int argc, char *argv[]){
       p_id = fork();
       if(p_id == 0){ //child
 
-	exeCom(argv + optind, ioe);
+	exeCom(argv + optind, ioe, fdArr, numFiles);
 	//if program is here, that means execvp failed
 	closeFds(fdArr, numFiles);
 	free(pidArr);
@@ -259,7 +281,7 @@ bool isComValid(int *fdArr, char *args[], int numFiles, int *ioe){
       return false;
     }
     //assign fd to appropriate place
-    ioe[i] = fdArr[fd];
+    ioe[i] = fd;
   }
 
   //check that command exists
@@ -273,7 +295,7 @@ bool isComValid(int *fdArr, char *args[], int numFiles, int *ioe){
 
 }
 
-void exeCom(char *args[], int *ioe){
+void exeCom(char *args[], int *ioe, int *fdArr, int numFiles){
 
   int l;
   for(l = 4; args[l] != NULL; l++){ //set one after last element to null
@@ -289,10 +311,12 @@ void exeCom(char *args[], int *ioe){
   int i;
   for (i = 0; i < 3; i++){
     close(i);
-    dup(ioe[i]);
-    close(ioe[i]);
-    ioe[i] == -1;
+    dup(fdArr[ioe[i]]);
+    close(fdArr[ioe[i]]);
+    fdArr[ioe[i]] = -1;
   }
+
+  closeFds(fdArr, numFiles);
 
   execvp(args[3], (args + 3));
 
@@ -450,4 +474,25 @@ pidWrapper *pAlloc(pidWrapper *pidArr, int numProc, int *nPid, int *fdArr, int n
     
   return pidArr;
     
+}
+
+
+bool makePipe(int *fdArr, int numFiles){
+
+  int pipeFd[2];
+  if(pipe(pipeFd) == -1){
+    perror("pipe");
+    fdArr[numFiles] = -1;
+    fdArr[numFiles + 1] = -1;
+    return false;
+  }
+
+  else{
+    fdArr[numFiles] = pipeFd[0];
+    fdArr[numFiles + 1] = pipeFd[1];
+  }
+
+  return true;
+
+
 }
