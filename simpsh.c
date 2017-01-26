@@ -25,7 +25,7 @@ int * fAlloc(int *fdArr, int numFiles, int *nFd, pidWrapper *pidArr);
 int ctoi(char* numChar);
 pidWrapper *pAlloc(pidWrapper *pidArr, int numProc, int *nPid, int *fdArr, int numFiles);
 bool makePipe(int *fdArr, int numFiles);
-
+void sigHandler(int sig);
 
 
 
@@ -61,7 +61,14 @@ int main(int argc, char *argv[]){
 
     {"command", no_argument, NULL, 'c' },
     {"wait", no_argument, NULL, 'w'},
+
+    {"close", required_argument, NULL, 'l'},
     {"verbose", no_argument, NULL, 'v' },
+    {"abort", no_argument, NULL, 'a' },
+    {"catch", required_argument, NULL, 'h'},
+    {"ignore", required_argument, NULL, 'i'},
+    {"default", required_argument, NULL, 'd'},
+    {"pause", no_argument, NULL, 'p'},
     {0, 0, 0, 0 },
   };
 
@@ -97,7 +104,10 @@ int main(int argc, char *argv[]){
   //parent related variables
   int retCode = 0;
 
-  while ((opt = getopt_long(argc, argv, "/0123456789r:s:t:ucwv", longopts, &longindex)) != -1){
+  //other temporary variables
+  int *setSegt = NULL;
+
+  while ((opt = getopt_long(argc, argv, "/0123456789r:s:t:ucwl:vah:i:d:p", longopts, &longindex)) != -1){
 
     printOpt(isVerbose, argv, prevInd);
     switch(opt) {
@@ -153,6 +163,7 @@ int main(int argc, char *argv[]){
 
       break;
 
+    //SUBCOMMAND OPTIONS
     case 'c':
       isValid = isComValid(fdArr, argv + optind, numFiles, ioe);
 
@@ -192,8 +203,34 @@ int main(int argc, char *argv[]){
     case 'w': //wait
       doWait = true;
       break;
+
+    //MISCELLANEOUS OPTIONS
+    case 'l': //close
+      fd = ctoi(optarg);
+      close(fdArr[fd]);
+      fdArr[fd] = -1;
+      break;
+
     case 'v':
       isVerbose = true;
+      break;
+    case 'a': //abort
+      closeFds(fdArr, numFiles);
+      free(pidArr);
+      *setSegt = 1;
+      break;
+
+    case 'h': //catch
+      signal(ctoi(optarg), sigHandler);
+      break;
+    case 'i': //ignore
+      signal(ctoi(optarg), SIG_IGN);
+      break;
+    case 'd': //default
+      signal(ctoi(optarg), SIG_DFL);
+      break;
+    case 'p': //pause
+      pause();
       break;
     default:
       printf("not an option\n");
@@ -202,6 +239,10 @@ int main(int argc, char *argv[]){
 
     prevInd = optind;
   } 
+
+
+  //cleanup
+  closeFds(fdArr, numFiles);
 
   if(doWait == true){
 
@@ -226,10 +267,7 @@ int main(int argc, char *argv[]){
     }
   }
 
-
-  //cleanup
-  closeFds(fdArr, numFiles);
-  free(pidArr);
+  free (pidArr);
 
   return retCode;
 
@@ -494,5 +532,12 @@ bool makePipe(int *fdArr, int numFiles){
 
   return true;
 
+
+}
+
+void sigHandler(int sig){
+
+  fprintf(stderr, "Caught signal %d. Exitting.\n", sig);
+  exit(sig);
 
 }

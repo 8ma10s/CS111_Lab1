@@ -1,2 +1,1 @@
-./simpsh: unrecognized option '--catch'
-./simpsh: unrecognized option '--wait'
+Caught signal 10. Exitting.

@@ -1,1 +1,2 @@
-./simpsh: unrecognized option '--close'
+Invalid file descriptor. Either the file descriptor is invalid (they must be between 0 and 2.), or is already closed.
+Skipping this command. 

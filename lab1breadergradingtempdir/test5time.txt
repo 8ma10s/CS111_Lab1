@@ -1,5 +1,4 @@
-./simpsh: unrecognized option '--wait'
 
-real	0m0.004s
+real	0m2.005s
 user	0m0.000s
-sys	0m0.001s
+sys	0m0.002s
