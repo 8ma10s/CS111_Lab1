@@ -1,4 +1,23 @@
-Limitations:
-So far, my parent process cannot get the return status of the child (s).
-Also, my parent process does not wait for child to finish (no wait option)
-File desriptors are not closed.
+simpsh
+
+About implemenation
+If any invalid options are typed, the program skips over the command.
+However, if that is a file option, it also skips the file descriptor position of that invalid command, so that the later command works as intended.
+so, if you type (in the folder with in.txt out.txt err.txt, but no dne.txt)
+--rdonly in.txt --wronly dne.txt --wronly out.txt --wronly err.txt \
+--command 0 1 2 cat \
+--command 0 2 3 cat
+Since the wronly assigment of dne.txt (at fd positon 1) is skipped and 1 becomes invalid, the first command gets skipped over, but the second command works just as intended (get the input from in.txt, output to out.txt, error to err.txt)
+
+Test Cases
+I checked the basics with the test cases, since more advanced testing was done on TA's script.
+Test case 1 tests if normal in/out works
+Test 2 tests if program returns 1 when rdonly file does not exist
+Test 3 tests if program retuns 1 when wronly file does not exist
+Test 4 tests if commands with reguired arguments are marked as invalid if there is no argument (e.g. no file name for --rdonly)
+Test 5 tests if rdwr works
+Test 6 tests if pipe works
+Test 7 tests if abort works
+
+Limitations
+I closed all fds and freed the allocated memory for both PID and File Descriptors, but I wasn't sure how to close the file when signal handler was called, because signal handler function can only take 1 argument (that is, the signal number) and therefore cannot pass the pointer of PID array / FD array

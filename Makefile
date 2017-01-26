@@ -14,14 +14,13 @@ check: simpsh
 	empty="" ; \
 	echo $${empty} > out.txt ; \
 	echo $${empty} > err.txt ; \
-	remove="rm -r 804608241makechecktest" ; \
+	remove="rm -rf 804608241makechecktest" ; \
 	./simpsh --rdonly=in.txt --wronly=out.txt --wronly=err.txt --command 0 1 2 cat ; \
 	if [ $$? -eq 0 ] ; \
 	then \
 	echo "test 1 passed." ; \
 	else \
 	echo "test 1 failed." ; \
-	rm * ; \
 	cd .. ; \
 	$${remove} ; \
 	exit 1 ; \
@@ -32,7 +31,6 @@ check: simpsh
 	echo "test 2 passed." ; \
 	else \
 	echo "test 2 failed." ; \
-	rm * ; \
 	cd .. ; \
 	$${remove} ; \
 	exit 1 ; \
@@ -43,7 +41,6 @@ check: simpsh
 	echo "test 3 passed." ; \
 	else \
 	echo "test 3 failed." ; \
-	rm * ; \
 	cd .. ; \
 	$${remove} ; \
 	exit 1 ; \
@@ -54,13 +51,42 @@ check: simpsh
 	echo "test 4 passed." ; \
 	else \
 	echo "test 4 failed." ; \
-	rm * ; \
+	cd .. ; \
+	$${remove} ; \
+	exit 1 ; \
+	fi ; \
+	./simpsh --rdwr=in.txt --rdwr=out.txt --wronly=err.txt --command 0 1 2 cat ; \
+	if [ $$? -eq 0 ] ; \
+	then \
+	echo "test 5 passed." ; \
+	else \
+	echo "test 5 failed." ; \
+	cd .. ; \
+	$${remove} ; \
+	exit 1 ; \
+	fi ; \
+	./simpsh --rdonly=in.txt --pipe --trunc --wronly=out.txt --wronly=err.txt --command 0 2 4 cat --command 1 3 4 cat ; \
+	diff in.txt out.txt ; \
+	if [ $$? -eq 0 ] ; \
+	then \
+	echo "test 6 passed." ; \
+	else \
+	echo "test 6 failed." ; \
+	cd .. ; \
+	$${remove} ; \
+	exit 1 ; \
+	fi ; \
+./simpsh --rdonly=in.txt --trunc --wronly=out.txt --trunc --wronly=err.txt --creat --wronly out2.txt --command 0 1 2 cat --abort --command 0 3 2 cat ; \
+	if [ ! -s out2.txt ] ; \
+	then \
+	echo "test 7 passed." ; \
+	else \
+	echo "test 7 failed." ; \
 	cd .. ; \
 	$${remove} ; \
 	exit 1 ; \
 	fi ; \
 	echo "ALL TESTS PASSED." ; \
-	rm * ; \
 	cd .. ; \
 	$${remove}
 
