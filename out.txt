@@ -2,6 +2,7 @@
 err.txt
 in.txt
 lab1areadergradingtempdir
+lab1breadergradingtempdir
 Makefile
 Makefile~
 out.txt

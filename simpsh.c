@@ -8,22 +8,34 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+typedef struct pidWrapper {
+  pid_t pid;
+  int index;
+}pidWrapper;
+
+
+
 int openFile(char *opt,int flags);
 bool isComValid(int *fdArr, char *args[],int numFiles, int *ioe);
 void exeCom(char *args[], int* ioe);
 int numArg(char *args[]);
 void printOpt(bool isVerbose, char *args[], int index);
 void closeFds(int *fdArr, int numFiles);
-int * fAlloc(int *fdArr, int numFiles, int *nFd);
+int * fAlloc(int *fdArr, int numFiles, int *nFd, pidWrapper *pidArr);
 int ctoi(char* numChar);
-
+pidWrapper *pAlloc(pidWrapper *pidArr, int numProc, int *nPid, int *fdArr, int numFiles);
 
 int main(int argc, char *argv[]){
 
   int *fdArr = NULL;
   int numFiles = 0;
   int nFd = 0;
-  fdArr = fAlloc(fdArr,numFiles, &nFd);
+
+  pidWrapper *pidArr = NULL;
+  int numProc = 0;
+  int nPid = 0;
+  fdArr = fAlloc(fdArr,numFiles, &nFd, pidArr);
+  pidArr = pAlloc(pidArr, numProc, &nPid, fdArr, numFiles);
 
   struct option longopts[] = { //all options
     {"append", no_argument, NULL, '/'},
@@ -42,6 +54,7 @@ int main(int argc, char *argv[]){
     {"wronly", required_argument, NULL, 's' },
     {"rdwr", required_argument, NULL, 't' },
     {"command", no_argument, NULL, 'c' },
+    {"wait", no_argument, NULL, 'w'},
     {"verbose", no_argument, NULL, 'v' },
     {0, 0, 0, 0 },
   };
@@ -58,10 +71,6 @@ int main(int argc, char *argv[]){
   int longindex;
   int prevInd = 1;
 
-  //fork related
-  int p_id;
-  int numProcess = 0;
-
   //option indicators
   bool isVerbose = false;
   bool doWait = false;
@@ -74,12 +83,15 @@ int main(int argc, char *argv[]){
   //command option temporary variables
   int ioe[3];
   bool isValid;
+  pid_t p_id;
 
-
+  //wait option temporary variables
+  int status;
+  int eStatus;
   //parent related variables
   int retCode = 0;
 
-  while ((opt = getopt_long(argc, argv, "/0123456789r:s:t:cv", longopts, &longindex)) != -1){
+  while ((opt = getopt_long(argc, argv, "/0123456789r:s:t:cwv", longopts, &longindex)) != -1){
 
     printOpt(isVerbose, argv, prevInd);
     switch(opt) {
@@ -104,7 +116,7 @@ int main(int argc, char *argv[]){
     case 't':
       //check that array is not full
       if(numFiles + 1 >= nFd){
-	fdArr = fAlloc(fdArr, numFiles, &nFd);
+	fdArr = fAlloc(fdArr, numFiles, &nFd, pidArr);
       }
       fd = openFile(argv[optind - 2],flags | perOpt[opt - 114]);
       //if failed to open, return code should be set to 1
@@ -122,26 +134,41 @@ int main(int argc, char *argv[]){
     case 'c':
       isValid = isComValid(fdArr, argv + optind, numFiles, ioe);
 
-      if (!isValid){ //if command is not valid, set return code to 1 and ignore the command
+      //if command is not valid, set return code to 1 and ignore the command
+      if (!isValid){ 
 	fprintf(stderr, "Skipping this command. \n");
 	retCode = 1;
 	break;
       }
+
+      //command is valid, so fork
       else{
+
+	if (numProc + 1 >= nPid){
+	  pidArr = pAlloc(pidArr, numProc, &nPid, fdArr, numFiles);
+	}
 
       p_id = fork();
       if(p_id == 0){ //child
 
 	exeCom(argv + optind, ioe);
-	return 0;
+	//if program is here, that means execvp failed
+	closeFds(fdArr, numFiles);
+	free(pidArr);
+	return -1;
       }
       else{ //parent
-	optind += numArg(argv + optind);
-	numProcess++;
+	pidArr[numProc].pid = p_id;
+	pidArr[numProc].index = optind + 3;
+	optind += numArg(argv + optind); 
+	numProc++;
       }
       
 
       }
+      break;
+    case 'w': //wait
+      doWait = true;
       break;
     case 'v':
       isVerbose = true;
@@ -154,6 +181,33 @@ int main(int argc, char *argv[]){
     prevInd = optind;
   } 
 
+  if(doWait == true){
+
+    int i,j;
+    for(i = 0; i < numProc; i++){
+      p_id = wait(&status);
+      if(!WIFEXITED(status)){
+	fprintf(stderr, "Child Process %d did not exit correctly. \n", p_id);
+	continue;
+      }
+      eStatus = WEXITSTATUS(status);
+      for(j = 0; j < numProc; j++){
+	if(p_id == pidArr[j].pid){
+	  printf("%d ", eStatus);
+	  printOpt(true, argv, pidArr[j].index);
+	  break;
+	}
+      }
+      if(eStatus > retCode){
+	retCode = eStatus;
+      }
+    }
+  }
+
+
+  //cleanup
+  closeFds(fdArr, numFiles);
+  free(pidArr);
 
   return retCode;
 
@@ -237,10 +291,10 @@ void exeCom(char *args[], int *ioe){
     close(i);
     dup(ioe[i]);
     close(ioe[i]);
+    ioe[i] == -1;
   }
 
   execvp(args[3], (args + 3));
-
 
 }
 
@@ -300,13 +354,14 @@ void closeFds(int *fdArr, int numFiles){
 
 
 }
-int *fAlloc(int *fdArr, int numFiles, int *nFd){
+int *fAlloc(int *fdArr, int numFiles, int *nFd, pidWrapper *pidArr){
 
   if(fdArr == NULL){ //malloc
     fdArr = (int*)malloc((*nFd + 100) * sizeof(int));
     if(fdArr == NULL){
-      fprintf(stderr, "Failed to allocate memory for the file descriptors.");
+      fprintf(stderr, "Failed to allocate memory for the file descriptors.\n");
       closeFds(fdArr, numFiles);
+      free(pidArr);
       _exit(1);
     }
     else{
@@ -321,6 +376,7 @@ int *fAlloc(int *fdArr, int numFiles, int *nFd){
       if(temp == NULL){
 	fprintf(stderr, "Failed to reallocate memory for the file descriptors.\n");
 	closeFds(fdArr, numFiles);
+	free(pidArr);
 	_exit(1);
       }
       else{
@@ -359,4 +415,39 @@ int ctoi(char *numChar){
 
     return fd;
 
+}
+
+pidWrapper *pAlloc(pidWrapper *pidArr, int numProc, int *nPid, int *fdArr, int numFiles){
+
+  if(pidArr == NULL){ //malloc
+    pidArr = (pidWrapper*)malloc((*nPid + 100) * sizeof(pidWrapper));
+    if(pidArr == NULL){
+      fprintf(stderr, "Failed to allocate memory for the process IDs.\n");
+      closeFds(fdArr, numFiles);
+      free(pidArr);
+      _exit(1);
+    }
+    else{
+      *nPid += 100;
+    }
+  }
+
+
+  else{ //realloc
+    pidWrapper *temp;
+    temp = (pidWrapper*)realloc(pidArr,(*nPid + 100) * sizeof(pidWrapper));
+    if(temp == NULL){
+      fprintf(stderr, "Failed to reallocate memory for the proces IDs.\n");
+      closeFds(fdArr, numFiles);
+      free(pidArr);
+      _exit(1);
+    }
+    else{
+      *nPid += 100;
+      pidArr = temp;
+    }
+  }
+    
+  return pidArr;
+    
 }
