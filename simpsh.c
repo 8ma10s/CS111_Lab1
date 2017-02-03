@@ -7,6 +7,9 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+
 
 typedef struct pidWrapper {
   pid_t pid;
@@ -26,7 +29,7 @@ int ctoi(char* numChar);
 pidWrapper *pAlloc(pidWrapper *pidArr, int numProc, int *nPid, int *fdArr, int numFiles);
 bool makePipe(int *fdArr, int numFiles);
 void sigHandler(int sig);
-
+void printProf(struct rusage *bUsage, char *args);
 
 
 int main(int argc, char *argv[]){
@@ -69,6 +72,7 @@ int main(int argc, char *argv[]){
     {"ignore", required_argument, NULL, 'i'},
     {"default", required_argument, NULL, 'd'},
     {"pause", no_argument, NULL, 'p'},
+    {"profile", no_argument, NULL, 'P'},
     {0, 0, 0, 0 },
   };
 
@@ -87,6 +91,7 @@ int main(int argc, char *argv[]){
   //option indicators
   bool isVerbose = false;
   bool doWait = false;
+  bool sayProf = false;
 
   //file option related
   int flags = 0; //accumulator for flags of file opening options
@@ -107,9 +112,15 @@ int main(int argc, char *argv[]){
   //other temporary variables
   int *setSegt = NULL;
 
-  while ((opt = getopt_long(argc, argv, "/0123456789r:s:t:ucwl:vah:i:d:p", longopts, &longindex)) != -1){
+  //profile variables
+  struct rusage bUsage;
+  struct rusage aUsage;
 
+  while ((opt = getopt_long(argc, argv, "/0123456789r:s:t:ucwl:vah:i:d:pP", longopts, &longindex)) != -1){
+
+    getrusage(RUSAGE_SELF, &bUsage);
     printOpt(isVerbose, argv, prevInd);
+
     switch(opt) {
 
       //FILE FLAG OPTIONS
@@ -232,10 +243,20 @@ int main(int argc, char *argv[]){
     case 'p': //pause
       pause();
       break;
+    case 'P': //profile
+      sayProf = true;
+      break;
     default:
       printf("not an option\n");
 
     }
+
+    if(sayProf == true){
+      printProf(&bUsage, argv[prevInd]);
+    }
+
+
+
 
     prevInd = optind;
   } 
@@ -268,6 +289,9 @@ int main(int argc, char *argv[]){
   }
 
   free (pidArr);
+
+
+  printProf(NULL, argv[0]);
 
   return retCode;
 
@@ -549,5 +573,45 @@ void sigHandler(int sig){
 
   fprintf(stderr, "Caught signal %d. Exitting.\n", sig);
   exit(sig);
+
+}
+
+void printProf(struct rusage* bUsage, char *args){
+
+  double sysTime = 0;
+  double userTime = 0;
+  struct rusage aUsage, pUsage, cUsage;
+  struct timeval sysVal, userVal;
+
+  if(bUsage != NULL){
+    sysVal = bUsage->ru_stime;
+    userVal = bUsage->ru_utime;
+
+  getrusage(RUSAGE_SELF, &aUsage);
+  
+  sysTime = (double) (((aUsage.ru_stime.tv_sec) - (sysVal.tv_sec)));
+  userTime = (double) (((aUsage.ru_utime.tv_sec) - (userVal.tv_sec)));
+  
+  sysTime += (double) (((aUsage.ru_stime.tv_usec) - (sysVal.tv_usec))/1000000.0);
+  userTime += (double) (((aUsage.ru_utime.tv_usec) - (userVal.tv_usec))/1000000.0);
+  
+  printf("%s: systime %f, usertime %f\n", args, sysTime, userTime);
+  }
+
+
+  else{
+    getrusage(RUSAGE_SELF, &pUsage);
+    getrusage(RUSAGE_CHILDREN, &cUsage);
+
+    sysTime = (double)(pUsage.ru_stime.tv_sec) + (double) ((pUsage.ru_stime.tv_usec) / 1000000.0);
+    userTime = (double)(pUsage.ru_utime.tv_sec) + (double) ((pUsage.ru_utime.tv_usec) / 1000000.0); 
+    printf("Parent total usage: system %f user %f\n", sysTime, userTime);
+
+    sysTime = (double)(cUsage.ru_stime.tv_sec) + (double) ((cUsage.ru_stime.tv_usec) / 1000000.0);
+    userTime = (double)(cUsage.ru_utime.tv_sec) + (double) ((cUsage.ru_utime.tv_usec) / 1000000.0); 
+    printf("Child total usage: system %f user %f\n", sysTime, userTime);
+
+  }
+
 
 }

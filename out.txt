@@ -5,6 +5,7 @@ lab1areadergradingtempdir
 lab1breadergradingtempdir
 Makefile
 Makefile~
+out2.txt
 out.txt
 README
 simpsh
