@@ -106,6 +106,7 @@ int main(int argc, char *argv[]){
   //wait option temporary variables
   int status;
   int eStatus;
+  int i, j;
   //parent related variables
   int retCode = 0;
 
@@ -213,6 +214,28 @@ int main(int argc, char *argv[]){
       break;
     case 'w': //wait
       doWait = true;
+      closeFds(fdArr, numFiles);
+      fdArr = NULL;
+      for(i = 0; i < numProc; i++){
+	p_id = wait(&status);
+	if(!WIFEXITED(status)){
+	  fprintf(stderr, "Child Process %d did not exit correctly. \n", p_id);
+	  continue;
+	}
+	eStatus = WEXITSTATUS(status);
+	for(j = 0; j < numProc; j++){
+	  if(p_id == pidArr[j].pid){
+	    printf("%d ", eStatus);
+	    printOpt(true, argv, pidArr[j].index);
+	    break;
+	  }
+	}
+	if(eStatus > retCode){
+	  retCode = eStatus;
+	}
+      }
+
+
       break;
 
     //MISCELLANEOUS OPTIONS
@@ -264,7 +287,7 @@ int main(int argc, char *argv[]){
 
   //cleanup
   closeFds(fdArr, numFiles);
-
+  /*
   if(doWait == true){
 
     int i,j;
@@ -286,7 +309,7 @@ int main(int argc, char *argv[]){
 	retCode = eStatus;
       }
     }
-  }
+  }*/
 
   free (pidArr);
 
@@ -435,6 +458,10 @@ void printOpt(bool isVerbose, char *args[], int index){
 
 void closeFds(int *fdArr, int numFiles){
 
+  if(fdArr == NULL){
+    return;
+  }
+
   int i;
   for (i = 0; i < numFiles; i++){
     if(fdArr[i] != -1){
@@ -443,6 +470,7 @@ void closeFds(int *fdArr, int numFiles){
 	perror(NULL);
 	fprintf(stderr, "\n");
       }
+      fdArr[i] = -1;
     }
   }
 
@@ -580,10 +608,10 @@ void printProf(struct rusage* bUsage, char *args){
 
   double sysTime = 0;
   double userTime = 0;
-  struct rusage aUsage, pUsage, cUsage;
-  struct timeval sysVal, userVal;
 
   if(bUsage != NULL){
+    struct rusage aUsage;
+    struct timeval sysVal, userVal;
     sysVal = bUsage->ru_stime;
     userVal = bUsage->ru_utime;
 
@@ -595,11 +623,12 @@ void printProf(struct rusage* bUsage, char *args){
   sysTime += (double) (((aUsage.ru_stime.tv_usec) - (sysVal.tv_usec))/1000000.0);
   userTime += (double) (((aUsage.ru_utime.tv_usec) - (userVal.tv_usec))/1000000.0);
   
-  printf("%s: systime %f, usertime %f\n", args, sysTime, userTime);
+  printf("%s: system %f, user %f\n", args, sysTime, userTime);
   }
 
 
   else{
+    struct rusage pUsage, cUsage;
     getrusage(RUSAGE_SELF, &pUsage);
     getrusage(RUSAGE_CHILDREN, &cUsage);
 
