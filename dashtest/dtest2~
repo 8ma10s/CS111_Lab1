@@ -1,0 +1,5 @@
+#!/usr/local/cs/bin/dash
+
+echo $0
+cat < /usr/share/dict/words 2> err2.txt | tr "a" "b"  2> err2.txt | sort 2> err2.txt | grep b > dout2.txt 2> err2.txt
+times

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+man -k file < /dev/null 2> err3.txt | tr -s ' ' '\n' 2> err3.txt | sort 2> err3.txt | sort -r 2> err3.txt | grep il 2> err3.txt | tr '\n' ' ' 2> err3.txt | wc -c > bout3.txt 2> err3.txt
+times

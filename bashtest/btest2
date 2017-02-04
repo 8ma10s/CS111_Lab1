@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cat < /usr/share/dict/words 2> err2.txt | tr "a" "b"  2> err2.txt | sort 2> err2.txt | grep b > bout2.txt 2> err2.txt
+times

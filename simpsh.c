@@ -274,7 +274,7 @@ int main(int argc, char *argv[]){
 
     }
 
-    if(sayProf == true){
+    if(sayProf == true && opt != 'P'){
       printProf(&bUsage, argv[prevInd]);
     }
 
@@ -313,8 +313,9 @@ int main(int argc, char *argv[]){
 
   free (pidArr);
 
-
-  printProf(NULL, argv[0]);
+  if(sayProf == true){
+      printProf(NULL, argv[0]);
+    }
 
   return retCode;
 

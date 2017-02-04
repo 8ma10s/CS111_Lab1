@@ -1,1 +1,4 @@
-./simpsh --rdonly /usr/share/dict/words --wronly err1.txt --pipe --pipe --wronly out1.txt --command 0 3 1 cat --command 2 5 1 sort -r --command 4 6 1 grep and
+./simpsh --rdonly /usr/share/dict/words --wronly err1.txt --pipe --pipe --wronly out1.txt --command 0 3 1 cat --command 2 5 1 sort -r --command 4 6 1 grep and --wait --profile
+./simpsh --rdonly /usr/share/dict/words --wronly out2.txt --wronly err2.txt --pipe --pipe --pipe --command 0 4 2 cat --command 3 6 2 tr "a" "b" --command 5 8 2 sort --command 7 1 2 grep b --wait --profile
+./simpsh --rdonly /dev/null --wronly out3.txt --wronly err3.txt --pipe --pipe --pipe --pipe --pipe --pipe --command 0 4 2 man -k file --command 3 6 2 tr -s ' ' '\n' --command 5 8 2 sort --command 7 10 2 sort -r --command 9 12 2 grep il --command 11 14 2 tr '\n' ' ' --command 13 1 2 wc -c
+ --wait --profile
