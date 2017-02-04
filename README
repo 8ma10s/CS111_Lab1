@@ -11,6 +11,8 @@ Since the wronly assigment of dne.txt (at fd positon 1) is skipped and 1 becomes
 
 Also, I have specified the command option so that three file desriptors passed in must be a different ones. If one of them is same as the other, the command is looked to be invalid and therefore is skipped.
 
+--Profile option shows the user/system time the parent process used between each option after the --profile option (this does NOT include profile option itself). Then, after all is done, it shows parent/child user/system time (this value is equivalent to using times option in bash/dash).
+ 
 
 Test Cases
 I checked the basics with the test cases, since more advanced testing was done on TA's script.
