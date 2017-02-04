@@ -623,7 +623,7 @@ void printProf(struct rusage* bUsage, char *args){
   sysTime += (double) (((aUsage.ru_stime.tv_usec) - (sysVal.tv_usec))/1000000.0);
   userTime += (double) (((aUsage.ru_utime.tv_usec) - (userVal.tv_usec))/1000000.0);
   
-  printf("%s: system %f, user %f\n", args, sysTime, userTime);
+  printf("%s: user %f, system %f\n", args, userTime, sysTime);
   }
 
 
@@ -634,11 +634,11 @@ void printProf(struct rusage* bUsage, char *args){
 
     sysTime = (double)(pUsage.ru_stime.tv_sec) + (double) ((pUsage.ru_stime.tv_usec) / 1000000.0);
     userTime = (double)(pUsage.ru_utime.tv_sec) + (double) ((pUsage.ru_utime.tv_usec) / 1000000.0); 
-    printf("Parent total usage: system %f user %f\n", sysTime, userTime);
+    printf("Parent total usage: user %f system %f\n", userTime, sysTime);
 
     sysTime = (double)(cUsage.ru_stime.tv_sec) + (double) ((cUsage.ru_stime.tv_usec) / 1000000.0);
     userTime = (double)(cUsage.ru_utime.tv_sec) + (double) ((cUsage.ru_utime.tv_usec) / 1000000.0); 
-    printf("Child total usage: system %f user %f\n", sysTime, userTime);
+    printf("Child total usage: user %f system %f\n", userTime, sysTime);
 
   }
 

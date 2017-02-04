@@ -1,0 +1,3 @@
+#!/bin/bash
+
+ls < bin1.txt 2> berr1.txt | sort -r 2> berr1.txt | grep a > bout1.txt 2> berr1.txt

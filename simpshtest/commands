@@ -1,0 +1,1 @@
+./simpsh --rdonly /usr/share/dict/words --wronly err1.txt --pipe --pipe --wronly out1.txt --command 0 3 1 cat --command 2 5 1 sort -r --command 4 6 1 grep and
