@@ -98,6 +98,6 @@ dist: simpsh.c README Makefile Lab_1C_Report.pdf
 	cp simpsh.c lab1-yamatosasaki/simpsh.c ; \
 	cp README lab1-yamatosasaki/README ; \
 	cp Makefile lab1-yamatosasaki/Makefile ; \
-	cp Lab_1C_Report.pdf ; \
+	cp Lab_1C_Report.pdf lab1-yamatosasaki/Lab_1C_Report.pdf ; \
 	tar -czvf lab1-yamatosasaki.tar.gz lab1-yamatosasaki ; \
 	rm -r lab1-yamatosasaki
