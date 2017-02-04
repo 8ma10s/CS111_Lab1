@@ -1,3 +1,0 @@
-#!/bin/bash
-
-cat < /usr/share/dict/words 2> berr1.txt | sort -r 2> berr1.txt | grep and > bout1.txt 2> berr1.txt
